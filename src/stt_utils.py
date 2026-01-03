@@ -14,11 +14,12 @@ FW_MODEL_ID = "small.en"
 FW_DEVICE = "cpu"
 FW_COMPUTE = "int8"
 
-FT_DIR = "sentiment-ecommerce-balanced"
+# Outside of src/
+FT_DIR = "../sentiment-ecommerce-balanced"
 FT_TOKENIZER_DIR = os.path.join(FT_DIR, "tokenizer")
 FT_MODEL_DIR = os.path.join(FT_DIR, "model")
 
-HITL_DIR = "hitl_data"
+HITL_DIR = "../human_categorized_data"
 HITL_FILE = os.path.join(HITL_DIR, "labels.csv")
 
 LABELS_UI = ["Negative", "Neutral", "Positive"]
