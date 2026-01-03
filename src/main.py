@@ -4,6 +4,58 @@ from stt_utils import *
 
 st.set_page_config(page_title="Speech-to-Text + Sentiment", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    /* Base radio styling */
+    div[role="radiogroup"] > label {
+        padding: 8px 18px;
+        border-radius: 10px;
+        margin-right: 10px;
+        font-weight: 700;
+        border: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+    }
+
+    /* 🔴 Negative */
+    div[role="radiogroup"] > label:nth-child(1) {
+        background-color: #ff3b3b;
+        color: white;
+        border-color: #b71c1c;
+    }
+
+    /* ⚪ Neutral */
+    div[role="radiogroup"] > label:nth-child(2) {
+        background-color: #9e9e9e;
+        color: white;
+        border-color: #424242;
+    }
+
+    /* 🟢 Positive */
+    div[role="radiogroup"] > label:nth-child(3) {
+        background-color: #00c853;
+        color: white;
+        border-color: #1b5e20;
+    }
+
+    /* Selected highlight */
+    div[role="radiogroup"] > label:has(input:checked) {
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35);
+        transform: scale(1.16);
+    }
+
+    /* Hover effect */
+    div[role="radiogroup"] > label:hover {
+        filter: brightness(1.15);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 # Session state
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = []
@@ -73,17 +125,20 @@ with tabs[0]:
                     "probs": [0.0, 1.0, 0.0],
                     "confidence": 0.0,
                     "human_label": "Neutral",
-                    "transcribed": False
+                    "transcribed": False,
+                    "saved": False,
                 }
 
             data = st.session_state.file_data[run_id]
+            if data.get("saved"):
+                continue
 
             # Form for each file (prevents rerun issues)
             with st.form(key=f"form_{run_id}"):
                 st.markdown(
                     f"""
                     <div style="
-                        border: 2px solid #4CAF50;
+                        border: 2px solid #ff942c;
                         border-radius: 10px;
                         padding: 15px;
                         margin-bottom: 20px;
@@ -114,50 +169,74 @@ with tabs[0]:
                 # Transcript
                 st.text_area(f"Transcript_{run_id}", data["text"], height=260, label_visibility="collapsed")
 
-                # Sentiment
-                st.metric("Model result", data["pred_label"])
-                st.caption(f"Confidence: {data['confidence']:.3f}")
+                col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
 
-                # Human labeling
-                selected_label = st.radio(
-                    "Human label",
-                    LABELS_UI,
-                    index=LABELS_UI.index(data["human_label"]),
-                    horizontal=True,
-                    key=f"human_{run_id}"
-                )
-                data["human_label"] = selected_label
+                with col1:
+                    st.metric("Model classification", data["pred_label"])
 
-                # Save 
-                submitted = st.form_submit_button(f"Save {uploaded.name}")
-                if submitted:
-                    append_hitl_row({
-                        "id": run_id,
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "text": data["text"],
-                        "pred_label": data["pred_label"].lower(),
-                        "pred_conf": data["confidence"],
-                        "p_neg": float(data["probs"][0]),
-                        "p_neu": float(data["probs"][1]),
-                        "p_pos": float(data["probs"][2]),
-                        "human_label": data["human_label"].lower(),
-                        "whisper_model": FW_MODEL_ID,
-                    })
-                    st.success(f"{uploaded.name} saved!")
+                with col2:
+                    conf = float(data["confidence"]) * 100
+                    st.metric("Confidence", f"{conf:.3f}%")
 
-                    # Update history
-                    st.session_state.history.append({
-                        "run_id": run_id,
-                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "text": data["text"],
-                        "pred_label": data["pred_label"],
-                        "confidence": data["confidence"],
-                        "p_neg": float(data["probs"][0]),
-                        "p_neu": float(data["probs"][1]),
-                        "p_pos": float(data["probs"][2]),
-                    })
-                    if len(st.session_state.history) > MAX_HISTORY:
-                        st.session_state.history = st.session_state.history[-MAX_HISTORY:]
+                with col3:
+                    selected_label = st.radio(
+                        "Accept or correct classification",
+                        LABELS_UI,
+                        index=LABELS_UI.index(data["human_label"]),
+                        horizontal=True,
+                        key=f"human_{run_id}"
+                    )
+                    data["human_label"] = selected_label
+
+                with col4:
+                    st.markdown(
+                        """
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            height: 100%;
+                        ">
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                    submitted = st.form_submit_button(f"Save {uploaded.name} classification")
+
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                    if submitted:
+                        append_hitl_row({
+                            "id": run_id,
+                            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "text": data["text"],
+                            "pred_label": data["pred_label"].lower(),
+                            "pred_conf": data["confidence"],
+                            "p_neg": float(data["probs"][0]),
+                            "p_neu": float(data["probs"][1]),
+                            "p_pos": float(data["probs"][2]),
+                            "human_label": data["human_label"].lower(),
+                            "whisper_model": FW_MODEL_ID,
+                        })
+                        st.success(f"{uploaded.name} saved!")
+                        data["saved"] = True
+
+                        st.session_state.history.append({
+                            "run_id": run_id,
+                            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "text": data["text"],
+                            "pred_label": data["pred_label"],
+                            "confidence": data["confidence"],
+                            "p_neg": float(data["probs"][0]),
+                            "p_neu": float(data["probs"][1]),
+                            "p_pos": float(data["probs"][2]),
+                        })
+
+                        if len(st.session_state.history) > MAX_HISTORY:
+                            st.session_state.history = st.session_state.history[-MAX_HISTORY:]
+
+
+
+
 
 # History tab
 with tabs[1]:
