@@ -97,7 +97,7 @@ The system is designed to support human decision-making rather than automate it 
 - Enables batch ingestion with controlled, per-item processing.
 
 ### What the Project Does Not Do (Currently)
-- Analyze vocal tone, pitch, or prosody.
+- Analyze vocal tone or pitch.
 - Perform acoustic emotion or affect detection.
 - Infer intent beyond textual sentiment.
 
@@ -155,3 +155,4 @@ Planned or potential extensions include:
 ## Summary
 
 SupportPulse demonstrates how **speech recognition, domain-specific NLP, and human-in-the-loop validation** can be combined to create a practical tool for customer support teams. By focusing on transcript-based sentiment analysis and explicit human review, the project emphasizes reliability, interpretability, and real-world operational workflows over fully automated decision-making.
+
