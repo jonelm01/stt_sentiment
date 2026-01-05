@@ -11,23 +11,24 @@ from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 import tempfile
 from pathlib import Path 
 
-# NEW: stable project paths (src/stt_utils.py -> project root)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SRC_DIR = PROJECT_ROOT / "src"
+# Paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
+
+FT_DIR = os.path.join(SRC_DIR, "sentiment-ecommerce-balanced")
+if not os.path.isdir(FT_DIR):
+    FT_DIR = os.path.join(PROJECT_ROOT, "sentiment-ecommerce-balanced")
+
+FT_TOKENIZER_DIR = os.path.join(FT_DIR, "tokenizer")
+FT_MODEL_DIR = os.path.join(FT_DIR, "model")
+
+HITL_DIR = os.path.join(PROJECT_ROOT, "hitl_data")
+HITL_FILE = os.path.join(HITL_DIR, "labels.csv")
 
 # Config
 FW_MODEL_ID = "small.en"
 FW_DEVICE = "cpu"
 FW_COMPUTE = "int8"
-
-# CHANGED: fine-tuned model paths now anchored to src/
-FT_DIR = SRC_DIR / "sentiment-ecommerce-balanced"
-FT_TOKENIZER_DIR = FT_DIR / "tokenizer"
-FT_MODEL_DIR = FT_DIR / "model"
-
-# CHANGED: HITL paths anchored to project root
-HITL_DIR = PROJECT_ROOT / "hitl_data"
-HITL_FILE = HITL_DIR / "labels.csv"
 
 LABELS_UI = ["Negative", "Neutral", "Positive"]
 
