@@ -54,8 +54,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
 # Session state
 if "uploaded_files" not in st.session_state:
     st.session_state.uploaded_files = []
@@ -65,6 +63,10 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "transcription_started" not in st.session_state:
     st.session_state.transcription_started = False  # flag to show containers
+
+# uploader reset key (forces file_uploader to clear after Reset)
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
 
 MAX_HISTORY = 50
 
@@ -84,9 +86,10 @@ with tabs[0]:
     with left:
         files = st.file_uploader(
             "Upload one or more files",
-            type=["mp3", "wav", "m4a"],
+            type=["mp3", "wav", "m4a", "mp4"],
             accept_multiple_files=True,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=f"uploader_{st.session_state.uploader_key}" 
         )
         if files:
             st.session_state.uploaded_files = files
@@ -107,6 +110,7 @@ with tabs[0]:
         st.session_state.uploaded_files.clear()
         st.session_state.file_data.clear()
         st.session_state.transcription_started = False
+        st.session_state.uploader_key += 1  
 
     # Start transcription
     if start and st.session_state.uploaded_files:
@@ -114,8 +118,11 @@ with tabs[0]:
 
     # Show containers after transcription started
     if st.session_state.transcription_started:
-        for uploaded in st.session_state.uploaded_files:
+        for i, uploaded in enumerate(st.session_state.uploaded_files):
             run_id = stable_run_id(uploaded.getvalue())
+
+            # per-upload unique key to prevent Streamlit key collisions
+            ui_key = f"{run_id}_{i}"
 
             if run_id not in st.session_state.file_data:
                 st.session_state.file_data[run_id] = {
@@ -134,7 +141,7 @@ with tabs[0]:
                 continue
 
             # Form for each file (prevents rerun issues)
-            with st.form(key=f"form_{run_id}"):
+            with st.form(key=f"form_{ui_key}"):
                 st.markdown(
                     f"""
                     <div style="
@@ -152,8 +159,14 @@ with tabs[0]:
                 # Transcription
                 if not data["transcribed"]:
                     with st.spinner(f"Transcribing {uploaded.name} ..."):
-                        audio = load_audio(uploaded.getvalue())
-                        text = transcribe(audio, whisper_model)
+                        file_bytes = uploaded.getvalue()
+
+                        try:
+                            audio = load_audio(file_bytes)
+                            text = transcribe(audio, whisper_model)
+                        except Exception:
+                            text = transcribe_bytes(file_bytes, uploaded.name, whisper_model)
+
                         pred_label, probs = analyze_sentiment(text, sent_tokenizer, sent_model)
                         conf = float(max(probs))
 
@@ -167,7 +180,13 @@ with tabs[0]:
                         })
 
                 # Transcript
-                st.text_area(f"Transcript_{run_id}", data["text"], height=260, label_visibility="collapsed")
+                st.text_area(
+                    "Transcript",
+                    data["text"],
+                    height=260,
+                    label_visibility="collapsed",
+                    key=f"transcript_{ui_key}"
+                )
 
                 col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
 
@@ -184,7 +203,7 @@ with tabs[0]:
                         LABELS_UI,
                         index=LABELS_UI.index(data["human_label"]),
                         horizontal=True,
-                        key=f"human_{run_id}"
+                        key=f"human_{ui_key}"
                     )
                     data["human_label"] = selected_label
 
@@ -200,7 +219,10 @@ with tabs[0]:
                         unsafe_allow_html=True
                     )
 
-                    submitted = st.form_submit_button(f"Save {uploaded.name} classification")
+                    submitted = st.form_submit_button(
+                        f"Save {uploaded.name} classification",
+                        key=f"save_{ui_key}"
+                    )
 
                     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -233,10 +255,6 @@ with tabs[0]:
 
                         if len(st.session_state.history) > MAX_HISTORY:
                             st.session_state.history = st.session_state.history[-MAX_HISTORY:]
-
-
-
-
 
 # History tab
 with tabs[1]:
