@@ -8,19 +8,26 @@ import numpy as np
 import pandas as pd
 from faster_whisper import WhisperModel
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
+import tempfile
+from pathlib import Path 
+
+# NEW: stable project paths (src/stt_utils.py -> project root)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = PROJECT_ROOT / "src"
 
 # Config
 FW_MODEL_ID = "small.en"
 FW_DEVICE = "cpu"
 FW_COMPUTE = "int8"
 
-# Outside of src/
-FT_DIR = "../sentiment-ecommerce-balanced"
-FT_TOKENIZER_DIR = os.path.join(FT_DIR, "tokenizer")
-FT_MODEL_DIR = os.path.join(FT_DIR, "model")
+# CHANGED: fine-tuned model paths now anchored to src/
+FT_DIR = SRC_DIR / "sentiment-ecommerce-balanced"
+FT_TOKENIZER_DIR = FT_DIR / "tokenizer"
+FT_MODEL_DIR = FT_DIR / "model"
 
-HITL_DIR = "../human_categorized_data"
-HITL_FILE = os.path.join(HITL_DIR, "labels.csv")
+# CHANGED: HITL paths anchored to project root
+HITL_DIR = PROJECT_ROOT / "hitl_data"
+HITL_FILE = HITL_DIR / "labels.csv"
 
 LABELS_UI = ["Negative", "Neutral", "Positive"]
 
@@ -35,14 +42,17 @@ def stable_run_id(audio_bytes):
     return h.hexdigest()[:16]
 
 def append_hitl_row(row):
-    os.makedirs(HITL_DIR, exist_ok=True)
+    # CHANGED: use Path APIs so it works regardless of working directory
+    HITL_DIR.mkdir(parents=True, exist_ok=True)
     df_new = pd.DataFrame([row])
-    if os.path.exists(HITL_FILE):
+
+    if HITL_FILE.exists():
         df_old = pd.read_csv(HITL_FILE)
         df_all = pd.concat([df_old, df_new], ignore_index=True)
         df_all = df_all.drop_duplicates(subset=["id"], keep="last")
     else:
         df_all = df_new
+
     df_all.to_csv(HITL_FILE, index=False)
 
 # Model loaders
@@ -50,14 +60,37 @@ def load_whisper():
     return WhisperModel(FW_MODEL_ID, device=FW_DEVICE, compute_type=FW_COMPUTE)
 
 def load_sentiment():
-    tokenizer = AutoTokenizer.from_pretrained(FT_TOKENIZER_DIR)
-    model = TFAutoModelForSequenceClassification.from_pretrained(FT_MODEL_DIR)
+    # CHANGED: HF loaders need string paths
+    tokenizer = AutoTokenizer.from_pretrained(str(FT_TOKENIZER_DIR))
+    model = TFAutoModelForSequenceClassification.from_pretrained(str(FT_MODEL_DIR))
     return tokenizer, model
 
 # Audio / Text processing
 def load_audio(file_bytes):
     audio, _ = librosa.load(io.BytesIO(file_bytes), sr=16000, mono=True)
     return audio
+
+def transcribe_bytes(file_bytes: bytes, filename: str, whisper_model):
+    """
+    Transcribe audio bytes by writing to a temporary file and letting faster-whisper decode it.
+    This avoids librosa/soundfile limitations with .m4a (AAC).
+    """
+    suffix = ""
+    if filename and "." in filename:
+        suffix = "." + filename.rsplit(".", 1)[-1].lower()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        segments, _ = whisper_model.transcribe(tmp_path, language="en")
+        return " ".join(s.text.strip() for s in segments)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 def transcribe(audio, whisper_model):
     segments, _ = whisper_model.transcribe(audio, language="en")
