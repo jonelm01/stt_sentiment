@@ -6,6 +6,15 @@ The application focuses on **transcript-based sentiment analysis**, with optiona
 
 ---
 
+## Collaborators
+
+- Jonel
+- Kevin
+- Matthew
+- Jason
+- Michael
+- Arnav
+
 ## Problem Statement
 
 Customer support calls contain valuable signals about customer satisfaction and frustration, but extracting those signals at scale is challenging.  
@@ -155,4 +164,5 @@ Planned or potential extensions include:
 ## Summary
 
 SupportPulse demonstrates how **speech recognition, domain-specific NLP, and human-in-the-loop validation** can be combined to create a practical tool for customer support teams. By focusing on transcript-based sentiment analysis and explicit human review, the project emphasizes reliability, interpretability, and real-world operational workflows over fully automated decision-making.
+
 
